@@ -1,0 +1,122 @@
+CREATE TABLE IF NOT EXISTS `Usuarios` (
+	`id_usuarios` BIGINT NOT NULL AUTO_INCREMENT,
+	`nombre_usuario` VARCHAR(255),
+	`pass` VARCHAR(255),
+	`email` VARCHAR(255),
+	`fecha_nac` DATE,
+	`tipo_usuario` VARCHAR(255),
+	PRIMARY KEY(`id_usuarios`)
+);
+
+
+CREATE TABLE IF NOT EXISTS `Peliculas` (
+	`id_peliculas` INT NOT NULL AUTO_INCREMENT,
+	`titulo` VARCHAR(255),
+	`sinopsis` TEXT(65535),
+	`duracion_minutos` INT,
+	`fecha_estreno` DATE,
+	`id_genero` INT COMMENT 'FK',
+	`promedio_calificacion_criticos` DECIMAL,
+	`pais_origen` INT,
+	`url_img` VARCHAR(255),
+	`promedio_calificacion_espectadores` INT,
+	`clasificacion_edad` VARCHAR(255),
+	`Estudio_cine` VARCHAR(255),
+	PRIMARY KEY(`id_peliculas`)
+);
+
+
+CREATE TABLE IF NOT EXISTS `Genero` (
+	`id_genero` INT NOT NULL AUTO_INCREMENT,
+	`nombre` VARCHAR(255),
+	PRIMARY KEY(`id_genero`)
+);
+
+
+CREATE TABLE IF NOT EXISTS `Persona` (
+	`id_persona` INT NOT NULL AUTO_INCREMENT,
+	`nombre_persona` VARCHAR(255),
+	`apellido_persona` VARCHAR(255),
+	`fecha_nacimiento` DATE,
+	`nacionalidad` INT,
+	`url_img` VARCHAR(255),
+	PRIMARY KEY(`id_persona`)
+);
+
+
+CREATE TABLE IF NOT EXISTS `Elenco` (
+	`id_elenco` INT NOT NULL AUTO_INCREMENT,
+	`id_pelicula` BIGINT COMMENT 'FK',
+	`id_persona` BIGINT COMMENT 'FK',
+	`rol` VARCHAR(255),
+	PRIMARY KEY(`id_elenco`, `id_pelicula`)
+);
+
+
+CREATE TABLE IF NOT EXISTS `Calificaciones` (
+	`id_calificacion` INT NOT NULL AUTO_INCREMENT,
+	`id_usuario` BIGINT COMMENT 'FK',
+	`id_pelicula` BIGINT COMMENT 'FK',
+	`puntuacion` INT COMMENT 'Restriccion 1 a 5 estrellas',
+	`comentario` TEXT(65535),
+	`fecha` TIMESTAMP,
+	`tipo_usuario` VARCHAR(255),
+	PRIMARY KEY(`id_calificacion`)
+);
+
+
+CREATE TABLE IF NOT EXISTS `Pais` (
+	`id_pais` INT NOT NULL AUTO_INCREMENT,
+	`Nombre` VARCHAR(255),
+	PRIMARY KEY(`id_pais`)
+);
+
+CREATE INDEX `Pais_index_0`
+ON `Pais` ();
+CREATE TABLE IF NOT EXISTS `Personaje` (
+	`id_personaje` INT NOT NULL AUTO_INCREMENT,
+	`nombre_personaje` VARCHAR(255),
+	`id_pelicula` INT,
+	`id_persona` INT,
+	PRIMARY KEY(`id_personaje`)
+);
+
+
+CREATE TABLE IF NOT EXISTS `Clasificacion_edad` (
+	`id_clasificacion` VARCHAR(255) NOT NULL,
+	`nombre` VARCHAR(255),
+	`Descripcion` VARCHAR(255),
+	PRIMARY KEY(`id_clasificacion`)
+);
+
+
+ALTER TABLE `Genero`
+ADD FOREIGN KEY(`id_genero`) REFERENCES `Peliculas`(`id_genero`)
+ON UPDATE NO ACTION ON DELETE NO ACTION;
+ALTER TABLE `Usuarios`
+ADD FOREIGN KEY(`id_usuarios`) REFERENCES `Calificaciones`(`id_usuario`)
+ON UPDATE NO ACTION ON DELETE NO ACTION;
+ALTER TABLE `Peliculas`
+ADD FOREIGN KEY(`id_peliculas`) REFERENCES `Calificaciones`(`id_pelicula`)
+ON UPDATE NO ACTION ON DELETE NO ACTION;
+ALTER TABLE `Peliculas`
+ADD FOREIGN KEY(`id_peliculas`) REFERENCES `Elenco`(`id_pelicula`)
+ON UPDATE NO ACTION ON DELETE NO ACTION;
+ALTER TABLE `Persona`
+ADD FOREIGN KEY(`id_persona`) REFERENCES `Elenco`(`id_persona`)
+ON UPDATE NO ACTION ON DELETE NO ACTION;
+ALTER TABLE `Personaje`
+ADD FOREIGN KEY(`id_pelicula`) REFERENCES `Peliculas`(`id_peliculas`)
+ON UPDATE NO ACTION ON DELETE NO ACTION;
+ALTER TABLE `Personaje`
+ADD FOREIGN KEY(`id_persona`) REFERENCES `Persona`(`id_persona`)
+ON UPDATE NO ACTION ON DELETE NO ACTION;
+ALTER TABLE `Persona`
+ADD FOREIGN KEY(`nacionalidad`) REFERENCES `Pais`(`id_pais`)
+ON UPDATE NO ACTION ON DELETE NO ACTION;
+ALTER TABLE `Pais`
+ADD FOREIGN KEY(`id_pais`) REFERENCES `Peliculas`(`pais_origen`)
+ON UPDATE NO ACTION ON DELETE NO ACTION;
+ALTER TABLE `Clasificacion_edad`
+ADD FOREIGN KEY(`id_clasificacion`) REFERENCES `Peliculas`(`clasificacion_edad`)
+ON UPDATE NO ACTION ON DELETE NO ACTION;
