@@ -1,0 +1,40 @@
+# ====================================================================
+# .gitignore optimizado para Proyecto de Base de Datos - Películas (DB2)
+# ====================================================================
+
+# --- Archivos de Base de Datos Locales y Backups ---
+# Evita subir archivos binarios pesados o volcados masivos de datos
+*.db
+*.sqlite
+*.local.sql
+*.bak
+*.sql.bak
+dump.sql
+backup.sql
+
+# --- Archivos de Configuración de Entorno Local ---
+# Para que ningún integrante suba sus credenciales de conexión locales
+.env
+config.local.json
+secrets.json
+
+# --- Archivos Temporales de Editores e IDEs ---
+# Ignora las carpetas automáticas de VS Code, Visual Studio o DataGrip
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.user
+
+# --- Archivos Temporales de Sistemas Operativos ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Archivos Temporales de Ofimática (Clave para Documentación) ---
+# Al abrir la plantilla del informe o minutas en Word, Office crea estos temporales ocultos
+~$*.docx
+~$*.xlsx
+~$*.pptx
