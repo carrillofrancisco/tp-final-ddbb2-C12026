@@ -34,34 +34,34 @@ BEGIN
     IF EXISTS
     (
         SELECT 1
-        FROM dbo.Usuarios
-        WHERE nombre_usuario = @nombre_usuario
+    FROM dbo.Usuarios
+    WHERE nombre_usuario = @nombre_usuario
     )
         THROW 50306, 'Ya existe un usuario con ese nombre.', 1;
 
     IF EXISTS
     (
         SELECT 1
-        FROM dbo.Usuarios
-        WHERE email = @email
+    FROM dbo.Usuarios
+    WHERE email = @email
     )
         THROW 50307, 'Ya existe un usuario con ese email.', 1;
 
     INSERT INTO dbo.Usuarios
-    (
+        (
         nombre_usuario,
         pass,
         email,
         fecha_nac,
         tipo_usuario
-    )
+        )
     VALUES
-    (
-        @nombre_usuario,
-        @pass,
-        @email,
-        @fecha_nac,
-        @tipo_usuario
+        (
+            @nombre_usuario,
+            @pass,
+            @email,
+            @fecha_nac,
+            @tipo_usuario
     );
 
     SELECT
@@ -92,8 +92,8 @@ BEGIN
     IF NOT EXISTS
     (
         SELECT 1
-        FROM dbo.Usuarios
-        WHERE id_usuarios = @id_usuario
+    FROM dbo.Usuarios
+    WHERE id_usuarios = @id_usuario
     )
         THROW 50308, 'El usuario indicado no existe.', 1;
 
@@ -115,18 +115,18 @@ BEGIN
     IF EXISTS
     (
         SELECT 1
-        FROM dbo.Usuarios
-        WHERE nombre_usuario = @nombre_usuario
-          AND id_usuarios <> @id_usuario
+    FROM dbo.Usuarios
+    WHERE nombre_usuario = @nombre_usuario
+        AND id_usuarios <> @id_usuario
     )
         THROW 50314, 'Ya existe otro usuario con ese nombre.', 1;
 
     IF EXISTS
     (
         SELECT 1
-        FROM dbo.Usuarios
-        WHERE email = @email
-          AND id_usuarios <> @id_usuario
+    FROM dbo.Usuarios
+    WHERE email = @email
+        AND id_usuarios <> @id_usuario
     )
         THROW 50315, 'Ya existe otro usuario con ese email.', 1;
 
@@ -153,16 +153,16 @@ BEGIN
     IF NOT EXISTS
     (
         SELECT 1
-        FROM dbo.Usuarios
-        WHERE id_usuarios = @id_usuario
+    FROM dbo.Usuarios
+    WHERE id_usuarios = @id_usuario
     )
         THROW 50316, 'El usuario indicado no existe.', 1;
 
     IF EXISTS
     (
         SELECT 1
-        FROM dbo.Calificaciones
-        WHERE id_usuario = @id_usuario
+    FROM dbo.Calificaciones
+    WHERE id_usuario = @id_usuario
     )
         THROW 50317, 'No se puede eliminar el usuario porque tiene calificaciones asociadas.', 1;
 
@@ -184,7 +184,39 @@ BEGIN
 END;
 GO
 
+CREATE OR ALTER PROCEDURE dbo.Login_Usuario
+    @nombre_usuario VARCHAR(255),
+    @pass VARCHAR(255)
+AS
+BEGIN
+    SET NOCOUNT ON;
 
+    SET @nombre_usuario = LTRIM(RTRIM(@nombre_usuario));
+    SET @pass = LTRIM(RTRIM(@pass));
+
+    IF @nombre_usuario IS NULL OR @nombre_usuario = ''
+        THROW 50318, 'El nombre de usuario es obligatorio para iniciar sesion.', 1;
+
+    IF @pass IS NULL OR @pass = ''
+        THROW 50319, 'La contrasena es obligatoria para iniciar sesion.', 1;
+
+    IF NOT EXISTS
+    (
+        SELECT 1
+    FROM dbo.Usuarios
+    WHERE nombre_usuario = @nombre_usuario AND pass = @pass
+    )
+        THROW 50320, 'Credenciales invalidas. Verifique el usuario y la contrasena.', 1;
+
+    SELECT
+        id_usuarios,
+        nombre_usuario,
+        email,
+        tipo_usuario
+    FROM dbo.Usuarios
+    WHERE nombre_usuario = @nombre_usuario AND pass = @pass;
+END;
+GO
 
 
 -- Usuario duplicado
