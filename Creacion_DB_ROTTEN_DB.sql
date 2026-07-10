@@ -144,6 +144,7 @@ CREATE TABLE dbo.Calificaciones
     id_calificacion INT IDENTITY(1,1) NOT NULL,
     id_usuario BIGINT NOT NULL,
     id_pelicula INT NOT NULL,
+    tipo_usuario VARCHAR(20) NOT NULL,
     puntuacion INT NOT NULL,
     comentario VARCHAR(MAX) NULL,
     fecha DATETIME NOT NULL
@@ -155,6 +156,7 @@ CREATE TABLE dbo.Calificaciones
         REFERENCES dbo.Usuarios(id_usuarios),
     CONSTRAINT FK_Calificaciones_Peliculas FOREIGN KEY (id_pelicula)
         REFERENCES dbo.Peliculas(id_peliculas),
+    CONSTRAINT CK_Calificaciones_TipoUsuario CHECK (tipo_usuario IN ('Espectador', 'Critico')),
     CONSTRAINT CK_Calificaciones_Puntuacion CHECK (puntuacion BETWEEN 1 AND 5),
     CONSTRAINT UQ_Calificaciones_UsuarioPelicula UNIQUE (id_usuario, id_pelicula)
 );
@@ -238,17 +240,19 @@ VALUES
 );
 GO
 
-INSERT INTO dbo.Calificaciones (id_usuario, id_pelicula, puntuacion, comentario)
+INSERT INTO dbo.Calificaciones (id_usuario, id_pelicula, tipo_usuario, puntuacion, comentario)
 VALUES
 (
     (SELECT id_usuarios FROM dbo.Usuarios WHERE nombre_usuario = 'lucia'),
     (SELECT id_peliculas FROM dbo.Peliculas WHERE titulo = 'Inception'),
+    (SELECT tipo_usuario FROM dbo.Usuarios WHERE nombre_usuario = 'lucia'),
     5,
     'Muy buena pelicula.'
 ),
 (
     (SELECT id_usuarios FROM dbo.Usuarios WHERE nombre_usuario = 'francisco'),
     (SELECT id_peliculas FROM dbo.Peliculas WHERE titulo = 'Inception'),
+    (SELECT tipo_usuario FROM dbo.Usuarios WHERE nombre_usuario = 'francisco'),
     4,
     'Buena construccion narrativa.'
 );
@@ -1699,6 +1703,8 @@ BEGIN
 
     SET @comentario = NULLIF(LTRIM(RTRIM(@comentario)), '');
 
+    DECLARE @tipo_usuario VARCHAR(20);
+
     IF NOT EXISTS
     (
         SELECT 1
@@ -1707,6 +1713,14 @@ BEGIN
           AND activo = 1
     )
         THROW 50801, 'El usuario especificado no existe.', 1;
+
+    SELECT @tipo_usuario = tipo_usuario
+    FROM dbo.Usuarios
+    WHERE id_usuarios = @id_usuario
+      AND activo = 1;
+
+    IF @tipo_usuario NOT IN ('Espectador', 'Critico')
+        THROW 50809, 'Solo los usuarios espectadores o criticos pueden calificar peliculas.', 1;
 
     IF NOT EXISTS
     (
@@ -1743,12 +1757,13 @@ BEGIN
         SET puntuacion = @puntuacion,
             comentario = @comentario,
             fecha = GETDATE(),
+            tipo_usuario = @tipo_usuario,
             activo = 1
         WHERE id_usuario = @id_usuario
           AND id_pelicula = @id_pelicula
           AND activo = 0;
 
-        SELECT id_usuario, id_pelicula, puntuacion, comentario, fecha
+        SELECT id_usuario, id_pelicula, tipo_usuario, puntuacion, comentario, fecha
         FROM dbo.Calificaciones
         WHERE id_usuario = @id_usuario
           AND id_pelicula = @id_pelicula
@@ -1758,11 +1773,11 @@ BEGIN
     END;
 
     INSERT INTO dbo.Calificaciones
-        (id_usuario, id_pelicula, puntuacion, comentario, fecha)
+        (id_usuario, id_pelicula, tipo_usuario, puntuacion, comentario, fecha)
     VALUES
-        (@id_usuario, @id_pelicula, @puntuacion, @comentario, GETDATE());
+        (@id_usuario, @id_pelicula, @tipo_usuario, @puntuacion, @comentario, GETDATE());
 
-    SELECT id_usuario, id_pelicula, puntuacion, comentario, fecha
+    SELECT id_usuario, id_pelicula, tipo_usuario, puntuacion, comentario, fecha
     FROM dbo.Calificaciones
     WHERE id_usuario = @id_usuario
       AND id_pelicula = @id_pelicula
@@ -1802,7 +1817,7 @@ BEGIN
       AND id_pelicula = @id_pelicula
       AND activo = 1;
 
-    SELECT id_usuario, id_pelicula, puntuacion, comentario, fecha
+    SELECT id_usuario, id_pelicula, tipo_usuario, puntuacion, comentario, fecha
     FROM dbo.Calificaciones
     WHERE id_usuario = @id_usuario
       AND id_pelicula = @id_pelicula
@@ -1856,7 +1871,7 @@ BEGIN
     SELECT
         c.id_usuario,
         u.nombre_usuario,
-        u.tipo_usuario,
+        c.tipo_usuario,
         c.puntuacion,
         c.comentario,
         c.fecha
@@ -1867,5 +1882,288 @@ BEGIN
     WHERE c.id_pelicula = @id_pelicula
       AND c.activo = 1
     ORDER BY c.fecha DESC;
+END;
+GO
+
+-- =============================================
+-- STORED PROCEDURES COMPUESTOS
+-- =============================================
+USE Rotten_DB;
+GO
+
+CREATE OR ALTER PROCEDURE dbo.SP_Crear_Pelicula_Con_Datos_Validos
+    @titulo VARCHAR(255),
+    @sinopsis VARCHAR(MAX) = NULL,
+    @duracion_minutos INT,
+    @fecha_estreno DATE = NULL,
+    @id_genero INT,
+    @pais_origen INT,
+    @url_img VARCHAR(255) = NULL,
+    @clasificacion_edad VARCHAR(20),
+    @estudio_cine VARCHAR(255) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        SET @titulo = LTRIM(RTRIM(@titulo));
+        SET @sinopsis = NULLIF(LTRIM(RTRIM(@sinopsis)), '');
+        SET @url_img = NULLIF(LTRIM(RTRIM(@url_img)), '');
+        SET @clasificacion_edad = LTRIM(RTRIM(@clasificacion_edad));
+        SET @estudio_cine = NULLIF(LTRIM(RTRIM(@estudio_cine)), '');
+
+        IF @titulo IS NULL OR @titulo = ''
+            THROW 51001, 'El titulo de la pelicula es obligatorio.', 1;
+
+        IF @duracion_minutos IS NULL OR @duracion_minutos <= 0
+            THROW 51002, 'La duracion debe ser mayor a cero.', 1;
+
+        IF NOT EXISTS
+        (
+            SELECT 1
+            FROM dbo.Genero
+            WHERE id_genero = @id_genero
+              AND activo = 1
+        )
+            THROW 51003, 'El genero indicado no existe o no esta activo.', 1;
+
+        IF NOT EXISTS
+        (
+            SELECT 1
+            FROM dbo.Pais
+            WHERE id_pais = @pais_origen
+              AND activo = 1
+        )
+            THROW 51004, 'El pais indicado no existe o no esta activo.', 1;
+
+        IF NOT EXISTS
+        (
+            SELECT 1
+            FROM dbo.Clasificacion_edad
+            WHERE id_clasificacion = @clasificacion_edad
+              AND activo = 1
+        )
+            THROW 51005, 'La clasificacion indicada no existe o no esta activa.', 1;
+
+        INSERT INTO dbo.Peliculas
+        (
+            titulo, sinopsis, duracion_minutos, fecha_estreno,
+            id_genero, pais_origen, url_img, clasificacion_edad, estudio_cine
+        )
+        VALUES
+        (
+            @titulo, @sinopsis, @duracion_minutos, @fecha_estreno,
+            @id_genero, @pais_origen, @url_img, @clasificacion_edad, @estudio_cine
+        );
+
+        DECLARE @id_pelicula INT = CAST(SCOPE_IDENTITY() AS INT);
+
+        COMMIT TRANSACTION;
+
+        SELECT *
+        FROM dbo.Peliculas
+        WHERE id_peliculas = @id_pelicula;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+
+        THROW;
+    END CATCH
+END;
+GO
+
+CREATE OR ALTER PROCEDURE dbo.SP_Crear_Persona_Y_Agregar_Al_Elenco
+    @id_pelicula INT,
+    @nombre_persona VARCHAR(255),
+    @apellido_persona VARCHAR(255),
+    @rol VARCHAR(255),
+    @fecha_nacimiento DATE = NULL,
+    @nacionalidad INT = NULL,
+    @url_img VARCHAR(255) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        SET @nombre_persona = LTRIM(RTRIM(@nombre_persona));
+        SET @apellido_persona = LTRIM(RTRIM(@apellido_persona));
+        SET @rol = LTRIM(RTRIM(@rol));
+        SET @url_img = NULLIF(LTRIM(RTRIM(@url_img)), '');
+
+        IF NOT EXISTS
+        (
+            SELECT 1
+            FROM dbo.Peliculas
+            WHERE id_peliculas = @id_pelicula
+              AND activo = 1
+        )
+            THROW 51101, 'La pelicula indicada no existe o no esta activa.', 1;
+
+        IF @nombre_persona IS NULL OR @nombre_persona = ''
+            THROW 51102, 'El nombre de la persona es obligatorio.', 1;
+
+        IF @apellido_persona IS NULL OR @apellido_persona = ''
+            THROW 51103, 'El apellido de la persona es obligatorio.', 1;
+
+        IF @rol IS NULL OR @rol = ''
+            THROW 51104, 'El rol es obligatorio.', 1;
+
+        IF @fecha_nacimiento > CAST(GETDATE() AS DATE)
+            THROW 51105, 'La fecha de nacimiento no puede ser futura.', 1;
+
+        IF @nacionalidad IS NOT NULL
+           AND NOT EXISTS
+           (
+               SELECT 1
+               FROM dbo.Pais
+               WHERE id_pais = @nacionalidad
+                 AND activo = 1
+           )
+            THROW 51106, 'El pais indicado no existe o no esta activo.', 1;
+
+        INSERT INTO dbo.Persona
+        (
+            nombre_persona, apellido_persona, fecha_nacimiento,
+            nacionalidad, url_img
+        )
+        VALUES
+        (
+            @nombre_persona, @apellido_persona, @fecha_nacimiento,
+            @nacionalidad, @url_img
+        );
+
+        DECLARE @id_persona INT = CAST(SCOPE_IDENTITY() AS INT);
+
+        INSERT INTO dbo.Elenco (id_pelicula, id_persona, rol)
+        VALUES (@id_pelicula, @id_persona, @rol);
+
+        DECLARE @id_elenco INT = CAST(SCOPE_IDENTITY() AS INT);
+
+        COMMIT TRANSACTION;
+
+        SELECT
+            e.id_elenco,
+            e.id_pelicula,
+            p.titulo AS pelicula,
+            pe.id_persona,
+            pe.nombre_persona,
+            pe.apellido_persona,
+            e.rol
+        FROM dbo.Elenco e
+        INNER JOIN dbo.Peliculas p ON p.id_peliculas = e.id_pelicula
+        INNER JOIN dbo.Persona pe ON pe.id_persona = e.id_persona
+        WHERE e.id_elenco = @id_elenco;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+
+        THROW;
+    END CATCH
+END;
+GO
+
+CREATE OR ALTER PROCEDURE dbo.SP_Crear_Calificacion_Pelicula
+    @id_usuario BIGINT,
+    @id_pelicula INT,
+    @puntuacion INT,
+    @comentario VARCHAR(MAX) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        SET @comentario = NULLIF(LTRIM(RTRIM(@comentario)), '');
+
+        IF NOT EXISTS
+        (
+            SELECT 1
+            FROM dbo.Usuarios
+            WHERE id_usuarios = @id_usuario
+              AND activo = 1
+              AND tipo_usuario IN ('Espectador', 'Critico')
+        )
+            THROW 51201, 'El usuario no existe, no esta activo o no puede calificar peliculas.', 1;
+
+        IF NOT EXISTS
+        (
+            SELECT 1
+            FROM dbo.Peliculas
+            WHERE id_peliculas = @id_pelicula
+              AND activo = 1
+        )
+            THROW 51202, 'La pelicula indicada no existe o no esta activa.', 1;
+
+        IF @puntuacion IS NULL OR @puntuacion < 1 OR @puntuacion > 5
+            THROW 51203, 'La puntuacion debe estar entre 1 y 5.', 1;
+
+        IF EXISTS
+        (
+            SELECT 1
+            FROM dbo.Calificaciones
+            WHERE id_usuario = @id_usuario
+              AND id_pelicula = @id_pelicula
+              AND activo = 1
+        )
+            THROW 51204, 'El usuario ya tiene una calificacion activa para esta pelicula.', 1;
+
+        IF EXISTS
+        (
+            SELECT 1
+            FROM dbo.Calificaciones
+            WHERE id_usuario = @id_usuario
+              AND id_pelicula = @id_pelicula
+              AND activo = 0
+        )
+        BEGIN
+            UPDATE dbo.Calificaciones
+            SET puntuacion = @puntuacion,
+                comentario = @comentario,
+                fecha = GETDATE(),
+                activo = 1
+            WHERE id_usuario = @id_usuario
+              AND id_pelicula = @id_pelicula
+              AND activo = 0;
+        END
+        ELSE
+        BEGIN
+            INSERT INTO dbo.Calificaciones
+                (id_usuario, id_pelicula, puntuacion, comentario, fecha)
+            VALUES
+                (@id_usuario, @id_pelicula, @puntuacion, @comentario, GETDATE());
+        END;
+
+        COMMIT TRANSACTION;
+
+        SELECT
+            c.id_calificacion,
+            c.id_usuario,
+            u.nombre_usuario,
+            u.tipo_usuario,
+            c.id_pelicula,
+            p.titulo,
+            c.puntuacion,
+            c.comentario,
+            c.fecha
+        FROM dbo.Calificaciones c
+        INNER JOIN dbo.Usuarios u ON u.id_usuarios = c.id_usuario
+        INNER JOIN dbo.Peliculas p ON p.id_peliculas = c.id_pelicula
+        WHERE c.id_usuario = @id_usuario
+          AND c.id_pelicula = @id_pelicula
+          AND c.activo = 1;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+
+        THROW;
+    END CATCH
 END;
 GO
