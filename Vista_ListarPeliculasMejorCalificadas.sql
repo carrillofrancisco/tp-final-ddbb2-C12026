@@ -40,6 +40,7 @@ BEGIN
     SET NOCOUNT ON;
 
     SELECT 
+        PERS.nombre AS nombre_persona, -- <-- Nueva columna agregada
         P.id_peliculas,
         P.titulo,
         P.fecha_estreno,
