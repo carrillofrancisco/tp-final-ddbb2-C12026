@@ -20,6 +20,7 @@ SELECT TOP 100 PERCENT
 FROM dbo.Peliculas P
 INNER JOIN dbo.Genero G ON P.id_genero = G.id_genero
 LEFT JOIN dbo.Calificaciones C ON P.id_peliculas = C.id_pelicula
+WHERE P.activo = 1  -- <--- Corrección: Filtra solo las películas activas
 GROUP BY 
     P.id_peliculas, P.titulo, G.nombre, P.duracion_minutos, 
     P.fecha_estreno, P.clasificacion_edad
