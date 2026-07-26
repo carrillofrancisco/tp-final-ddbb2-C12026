@@ -13,43 +13,51 @@ BEGIN
 
     SET @comentario = NULLIF(LTRIM(RTRIM(@comentario)), '');
 
-
+    -- 1. Validar existencia del usuario
     IF NOT EXISTS
     (
         SELECT 1
-    FROM dbo.Usuarios
-    WHERE id_usuarios = @id_usuario
+        FROM dbo.Usuarios
+        WHERE id_usuarios = @id_usuario
     )
         THROW 50801, 'El usuario especificado no existe.', 1;
 
+    -- 2. Validar existencia de la película
     IF NOT EXISTS
     (
         SELECT 1
-    FROM dbo.Peliculas
-    WHERE id_peliculas = @id_pelicula
+        FROM dbo.Peliculas
+        WHERE id_peliculas = @id_pelicula
     )
         THROW 50802, 'La pelicula especificada no existe.', 1;
 
-
+    -- 3. Validar rango de puntuación
     IF @puntuacion IS NULL OR @puntuacion < 1 OR @puntuacion > 5
         THROW 50803, 'La puntuacion debe estar estrictamente entre 1 y 5.', 1;
 
-
+    -- 4. Validar calificación duplicada
     IF EXISTS
     (
         SELECT 1
-    FROM dbo.Calificaciones
-    WHERE id_usuario = @id_usuario AND id_pelicula = @id_pelicula
+        FROM dbo.Calificaciones
+        WHERE id_usuario = @id_usuario AND id_pelicula = @id_pelicula
     )
         THROW 50804, 'El usuario ya ha calificado esta pelicula previamente.', 1;
 
-    -- Insertar calificación (La fecha toma GETDATE() por defecto según el diseño del DER refactorizado)
-    INSERT INTO dbo.Calificaciones
-        (id_usuario, id_pelicula, puntuacion, comentario, fecha)
-    VALUES
-        (@id_usuario, @id_pelicula, @puntuacion, @comentario, GETDATE());
+    -- 5. Obtener automáticamente el tipo_usuario desde la tabla Usuarios
+    DECLARE @tipo_usuario VARCHAR(20);
 
-    SELECT id_usuario, id_pelicula, puntuacion, comentario, fecha
+    SELECT @tipo_usuario = tipo_usuario
+    FROM dbo.Usuarios
+    WHERE id_usuarios = @id_usuario;
+
+    -- 6. Insertar calificación incluyendo la columna tipo_usuario
+    INSERT INTO dbo.Calificaciones
+        (id_usuario, id_pelicula, puntuacion, comentario, fecha, tipo_usuario)
+    VALUES
+        (@id_usuario, @id_pelicula, @puntuacion, @comentario, GETDATE(), @tipo_usuario);
+
+    SELECT id_usuario, id_pelicula, puntuacion, comentario, fecha, tipo_usuario
     FROM dbo.Calificaciones
     WHERE id_usuario = @id_usuario AND id_pelicula = @id_pelicula;
 END;
